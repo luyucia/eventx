@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="Semantic-UI-CSS-master/semantic.min.css">
+</head>
+<body>
+<!--  -->
+<div class="ui fixed inverted menu">
+    <div class="ui container">
+      <a href="#" class="header item">
+       EventX
+      </a>
+      <a href="#" class="item">Home</a>
+      <div class="ui simple dropdown item right">
+        Setting <i class="dropdown icon"></i>
+        <div class="menu">
+          <a class="item" href="#">Mail</a>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="app ui stackable grid">
+  <div class="two wide column">
+  <div class="ui secondary vertical menu">
+      <a v-for="app in appList" @click="loadEventList(app)"  class="item" :class="{'active':app==currentApp}">
+        {{app}}
+        <template v-if="app==newMessageApp"><i class="announcement icon"></i></template>
+      </a>
+    </div>
+  </div>
+  <div class="thirteen wide column">
+    <table class="ui fixed single line celled table">
+      <thead>
+        <tr>
+          <th>num</th>
+          <th>DateTime</th>
+          <th>Event</th>
+          <th>Count</th>
+          <th>Detail(click show more)</th>
+          <th>HandlerResult</th>
+          <th>WebHook</th>
+          <th colspan="2">operate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(index,event) in eventList">
+          <td>{{index}}</td>
+          <td>{{event.dateTime}}</td>
+          <td>{{event.eventName}}</td>
+          <td>{{event.eventCount}}</td>
+          <td @click="showDetail(event.detail)">{{event.detail}}</td>
+          <td>{{event.handlerResult}}</td>
+          <td>{{event.handlerUrl}}</td>
+          <td >
+          <div class="blue ui buttons">
+            <button class="ui button" @click="showAddHandler(event.eventName,index)">Set WebHook</button>
+          </div>
+          </td>
+          <td>
+            <button class="ui button icon" @click="showAddMail(event.eventName)"><i class="mail icon"></i></button>
+            <button class="ui button icon" @click="deleteEvent(event.eventName)"><i class="remove icon"></i></button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+<!-- web hook set modal -->
+<div class="webhookmodal ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+      Add Event Handler for {{currentEvent}}
+    </div>
+    <div class="content">
+      <form class="ui form">
+      <div class="fields">
+          <div class="twelve wide field">
+            <input type="text" placeholder="handler url eg. http://api.xxx.com/sendemail" v-model="currentHandlerUrl">
+          </div>
+          <div class="four wide field">
+            <div class="ui radio ">
+              <input type="radio" name="method" tabindex="0" value="GET" v-model="handlerMethod">
+              <label>GET</label>
+              <input type="radio" name="method" tabindex="0" value="POST" v-model="handlerMethod">
+              <label>POST</label>
+            </div>
+          </div>
+      </div>
+      </form>
+    </div>
+    <div class="actions">
+      <div class="ui black deny button">
+        Cancle
+      </div>
+      <div class="ui positive right labeled icon button" @click="saveHandler()">
+        confirm
+        <i class="checkmark icon"></i>
+      </div>
+    </div>
+  </div>
+<!-- email modal -->
+<div class="mailmodal ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+      Add Email for {{currentEvent}}
+    </div>
+    <div class="content">
+      <div class="ui labeled input">
+        <div class="ui label">Email</div>
+        <input type="text" placeholder="example@gmail.com;example@163.com" v-model="mail_input_email">
+        <div class="ui label">title</div>
+        <input type="text" placeholder="title" v-model="mail_input_title">
+        <div class="ui label">content</div>
+        <input type="text" placeholder="content" v-model="mail_input_content">
+      </div>
+    </div>
+    <div class="actions">
+      <div class="ui black deny button">
+        Cancle
+      </div>
+      <div class="ui positive right labeled icon button" @click="saveMail()">
+        confirm
+        <i class="checkmark icon"></i>
+      </div>
+    </div>
+  </div>
+
+
+<div class="detailmodal ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+      Detail
+    </div>
+    <div class="content ui form">
+    <div class="field">
+      <textarea>{{currentDetail}}</textarea>
+    </div>
+    </div>
+    <div class="actions">
+      <div class="ui black deny button">
+        Cancle
+      </div>
+    </div>
+</div>
+
+
+
+</div>
+
+</body>
+<script type="text/javascript" src="js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="js/vue.js"></script>
+<script type="text/javascript" src="Semantic-UI-CSS-master/semantic.min.js"></script>
+</html>
+<script type="text/javascript">
+
+// var ws = new WebSocket("ws://eventx.calli-media.com/notify");
+// ws.onopen = function() {
+//   // 连接通知服务器,报告自己的id
+//   var clientId = "id"+Math.round(Math.random()*100000000);
+//   ws.send('reg:'+clientId);
+//   console.log('connected')
+//   console.log(this)
+// };
+// ws.onmessage = function (evt) {
+//    if(evt.data == app.currentApp){
+//      app.loadEventList(app.currentApp)
+//    }
+// };
+// ws.onclose = function(){
+//   console.log('connect closed reconnect...')
+
+//   ws = new WebSocket("ws://eventx.calli-media.com/notify");
+
+// }
+
+var websocket = {
+  ws:null,
+  init:function(){
+    this.ws = new WebSocket("ws://eventx.calli-media.com/notify");
+    this.ws.onopen = function() {
+      // 连接通知服务器,报告自己的id
+      var clientId = "id"+Math.round(Math.random()*100000000);
+      this.ws.send('reg:'+clientId);
+      console.log('connected')
+    }.bind(this);
+    this.ws.onmessage = function (evt) {
+       app.newMessageApp = evt.data
+       if(evt.data == app.currentApp){
+         app.loadEventList(app.currentApp)
+
+       }else{
+        app.newMessageApp
+       }
+    };
+    this.ws.onclose = function(){
+      console.log('connect closed reconnect...')
+      websocket.init()
+    }
+  }
+}
+websocket.init()
+
+
+var app = new Vue({
+    data:{
+        appList:[],
+        eventList:[],
+        currentApp:'',
+        currentEvent:'',
+        currentHandlerUrl:'',
+        newMessageApp:'',
+        handlerMethod:'',
+        mail_input_email:'',
+        mail_input_title:'',
+        mail_input_content:'',
+        currentDetail:''
+
+    },
+    methods:{
+        loadAppList:function(){
+            vm = this
+            $.get('http://eventx.calli-media.com/api/appList',{},function(response){
+                vm.appList = response.data
+            },'json')
+        },
+        loadEventList:function(app){
+            this.currentApp = app;
+            if(this.currentApp == this.newMessageApp){
+              this.newMessageApp = ''
+            }
+            vm = this
+            $.get('http://eventx.calli-media.com/api/eventList',{"app":this.currentApp},function(response){
+                vm.eventList = response.data
+            },'json')
+        },
+        showAddHandler:function(event,i){
+          t = jQuery.parseJSON(this.eventList[i].handlerUrl )
+          if (t!=null){
+            this.handlerMethod = t.method;
+            this.currentHandlerUrl = t.url;
+          }else{
+            this.handlerMethod = '';
+            this.currentHandlerUrl = '';
+          }
+          this.currentEvent = event;
+          $('.webhookmodal').modal('show');
+        },
+        showAddMail:function(event){
+          // console.log(event)
+          this.currentEvent = event;
+          $('.mailmodal').modal('show');
+        },
+        showDetail:function(detail){
+          // console.log(event)
+          this.currentDetail = detail;
+          $('.detailmodal').modal('show');
+        },
+        saveHandler:function(){
+          vm = this
+          $.post('http://eventx.calli-media.com/api/saveHandler',{'app':this.currentApp,'event':this.currentEvent,'handlerUrl':this.currentHandlerUrl,'method':this.handlerMethod},function(response){
+            if(response.code==0){
+              vm.loadEventList(vm.currentApp)
+            }
+          },'json')
+        },
+        saveMail:function(){
+          vm = this
+          $.post('http://eventx.calli-media.com/api/saveMailInfo',{'app':this.currentApp,'event':this.currentEvent,'emails':this.mail_input_email,'title':this.mail_input_title,'content':this.mail_input_content},function(response){
+            if(response.code==0){
+              vm.loadEventList(vm.currentApp)
+            }
+          },'json')
+        },
+        deleteEvent:function(eventName){
+          vm = this
+          if ( confirm('confirm to delete?') ){
+            $.post('http://eventx.calli-media.com/api/deleteEvent',{'app':this.currentApp,'event':eventName},function(response){
+              if(response.code==0){
+                vm.loadEventList(vm.currentApp)
+              }
+            },'json');
+          }
+        }
+    }
+})
+
+app.$mount('.app')
+app.loadAppList()
+</script>
